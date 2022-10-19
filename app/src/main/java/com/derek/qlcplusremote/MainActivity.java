@@ -7,6 +7,7 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -27,16 +28,27 @@ public class MainActivity extends AppCompatActivity {
     boolean loaded=false;
     String ip;
     @Override
+
     protected void onCreate(Bundle savedInstanceState) {
         Intent i = getIntent();
         ip = i.getStringExtra(ConnectActivity.ip);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         qlcWebView = (WebView) findViewById(R.id.webview);
         qlcWebView.getSettings().setJavaScriptEnabled(true);
         qlcWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Connecting please wait...");
+        progressDialog.setMessage("Connecting to "+ip+".\nPlease wait...");
+        progressDialog.setCancelable(false);
+        progressDialog.setButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                progressDialog.dismiss();
+                MainActivity.this.finish();
+                qlcWebView.stopLoading();
+            }
+        });
         progressDialog.show();
         qlcWebView.setWebViewClient(new WebViewClient() {
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -62,16 +74,14 @@ public class MainActivity extends AppCompatActivity {
                 else{
                     errorLoad=true;
                     finish();
-                    Toast.makeText(MainActivity.this, error.getDescription(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, error.getDescription().toString().replace("net::ERR","").replace("_"," "), Toast.LENGTH_LONG).show();
                 }
             }
-
         });
         qlcWebView.setWebChromeClient(new WebChromeClient() {
             public void onProgressChanged(WebView view, int progress) {
 
             }
-
             public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
                 if (message.equals("QLC+ connection lost!")){
                     reloadAlert(message);
@@ -82,7 +92,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
-
         qlcWebView.loadUrl("http://"+ip+":9999/");
     }
 
@@ -91,29 +100,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void reloadAlert(String message){
+        if(message.toString().equals("net::ERR_CONNECTION_REFUSED")){
+            qlcWebView.setVisibility(View.INVISIBLE);
+        }
         AlertDialog.Builder builder1 = new AlertDialog.Builder(MainActivity.this);
-        builder1.setMessage(message);
-        builder1.setCancelable(true);
+        builder1.setMessage(message.toString().replace("net::ERR","").replace("_"," "));
+        builder1.setCancelable(false);
         builder1.setPositiveButton(
-                "Reconnect",
+                "Ok",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        dialog.cancel();
-                        qlcWebView.reload();
-                        progressDialog = new ProgressDialog( MainActivity.this);
-                        progressDialog.setMessage("Connecting please wait...");
-                        progressDialog.show();
+                       System.exit(0);
+                        Intent launchIntent = getPackageManager().getLaunchIntentForPackage("com.derek.qlcplusremote");
+                        if (launchIntent != null) {
+                            startActivity(launchIntent);
+                        } else {
+                            Toast.makeText(MainActivity.this, "There is no package available in android", Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
-        builder1.setNegativeButton(
-                "Exit",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        dialog.cancel();
-                        finish();
-                    }
-                });
-
         AlertDialog alert1 = builder1.create();
         alert1.show();
     }
